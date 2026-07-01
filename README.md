@@ -1,7 +1,3 @@
-------------------------------------------------------------------------
-
-editor_options: markdown: wrap: 72 ---
-
 # Publication bias in psilocybin depression trials: a RoBMA re-analysis
 
 [![Status](https://img.shields.io/badge/status-under%20review-orange)]() [![R](https://img.shields.io/badge/R-4.6.1-blue)](https://cran.r-project.org/) [![RoBMA](https://img.shields.io/badge/RoBMA-4.0.0-blue)](https://cran.r-project.org/package=RoBMA) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
