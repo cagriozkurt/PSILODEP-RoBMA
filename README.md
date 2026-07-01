@@ -6,7 +6,9 @@
 
 This repository contains the full reproducibility code for an independent re-analysis of Singleton et al. (2026), submitted as a **Matters Arising** to *Nature Mental Health*.
 
-**Target paper:** \> Singleton SP, Sevchik BL, Lahey A, Cuijpers P, Harrer M, Jones MT, Nayak SM, \> Strain EC, Vandekar SN, Dworkin RH, Scott JC, & Satterthwaite TD. A living \> systematic review, meta-analysis and open-data resource of randomized controlled \> trials of psilocybin treatment for symptoms of depression. \> *Nature Mental Health* (2026).
+**Target paper:** 
+
+> Singleton SP, Sevchik BL, Lahey A, Cuijpers P, Harrer M, Jones MT, Nayak SM, Strain EC, Vandekar SN, Dworkin RH, Scott JC, & Satterthwaite TD. A living systematic review, meta-analysis and open-data resource of randomized controlled trials of psilocybin treatment for symptoms of depression. *Nature Mental Health* (2026).
 
 **Open dataset:** Singleton P, Harrer M & Sevchik B. `metapsy-project/data-depression-psiloctr`. Zenodo (2025). <https://doi.org/10.5281/zenodo.17657950>
 
@@ -43,7 +45,6 @@ sypres/
 ├── fig1_robma_main.jpg           # Main Figure 1 (three-panel)
 ├── fig_ED1_prior_sensitivity.jpg # Extended Data Figure 1: prior sensitivity
 ├── fig_ED2_dichotomous.jpg       # Extended Data Figure 2: response and remission
-│
 ├── psilodep-robma-results.RData  # Pre-computed RoBMA models
 ├── .gitignore
 └── README.md
