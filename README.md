@@ -26,13 +26,13 @@ RoBMA fits an ensemble of 12 models simultaneously varying effect presence, hete
 
 | Analysis | k | Published g | RoBMA μ [95% CrI] | BF_pb |
 |---------------|---------------|---------------|---------------|---------------|
-| Primary (single-level) | 12 | 0.90 [0.55, 1.26] | 0.53 [0.00, 1.00] | **3.90** |
+| Primary (single-level) | 12 | 0.90 [0.55, 1.26] | 0.53 [0.00, 1.00] | **3.89** |
 | Excl. open-label | 9 | 0.81 [0.60, 1.03] | 0.77 [0.00, 0.99] | 0.73 |
 | Multilevel (all timepoints) | 37 (12 clusters) | 0.82 [0.57, 1.08]† | 0.00 [−0.15, 0.77] | **28.27** |
 
 †CHE model estimate (Singleton et al.); multilevel result is exploratory.
 
-**Primary finding:** Moderate evidence for publication bias (BF_pb = 3.90; posterior probability = 0.80). The bias-corrected pooled effect (g ≈ 0.53) is 41% smaller than the published value, with a credible interval spanning to zero. The bias signal dissipates when open-label studies or the Davis (2021) outlier are excluded, suggesting design-specific expectancy inflation rather than file-drawer suppression of blinded trials.
+**Primary finding:** Moderate evidence for publication bias (BF_pb = 3.89; posterior probability = 0.80). The bias-corrected pooled effect (g ≈ 0.53) is 41% smaller than the published value, with a credible interval spanning to zero. The bias signal dissipates when open-label studies or the Davis (2021) outlier are excluded, suggesting design-specific expectancy inflation rather than file-drawer suppression of blinded trials.
 
 ------------------------------------------------------------------------
 
@@ -40,12 +40,10 @@ RoBMA fits an ensemble of 12 models simultaneously varying effect presence, hete
 
 ```         
 sypres/
-├── psilodep-robma.Rmd            # Main analysis — set run_fresh = TRUE/FALSE here
-├── ED_Table1_comprehensive_results.csv  # Extended Data Table 1 (all RoBMA runs)
-├── fig1_robma_main.jpg           # Main Figure 1 (three-panel)
-├── fig_ED1_prior_sensitivity.jpg # Extended Data Figure 1: prior sensitivity
-├── fig_ED2_dichotomous.jpg       # Extended Data Figure 2: response and remission
-├── psilodep-robma-results.RData  # Pre-computed RoBMA models
+├── psilodep-robma.Rmd             # Main analysis — set run_fresh = TRUE/FALSE here
+├── extract_sample_sizes.R         # Pulls per-study arm N (Supplementary Table 1)
+├── sample_sizes_primary.csv       # Output of extract_sample_sizes.R
+├── psilodep-robma-results.RData   # Pre-computed RoBMA models
 ├── .gitignore
 └── README.md
 ```
@@ -62,7 +60,7 @@ sypres/
 
 ### Full rerun from scratch (\~90 min)
 
-Set `run_fresh <- TRUE` in `psilodep-robma.Rmd`. This fits all 14 RoBMA models (primary, 5 subgroups, 5 sensitivities, response, remission, multilevel) and saves `psilodep-robma-results.RData`.
+Set `run_fresh <- TRUE` in `psilodep-robma.Rmd`. This fits all 17 RoBMA models (primary, 5 subgroups, 5 sensitivities, 3 additional prior-sensitivity fits, response, remission, multilevel) and saves `psilodep-robma-results.RData`.
 
 ------------------------------------------------------------------------
 
@@ -101,7 +99,7 @@ install.packages("RoBMA", type = "source")
 
 ## Seed
 
-All MCMC models use `seed = 4821`. Results may differ slightly across platforms due to JAGS compiler differences; the conclusions are robust to these variations (R-hat ≤ 1.01 for all parameters).
+All MCMC models use `seed = 4821`. Results may differ slightly across platforms due to JAGS compiler differences; the conclusions are robust to these variations. 15 of 17 models achieved R-hat ≤ 1.01 for μ; the open-label-exclusion (R-hat = 1.016) and Davis-2021-exclusion (R-hat = 1.010) subgroup models exceeded this threshold despite adequate effective sample size — see Extended Data Table 1 in the manuscript for full diagnostics.
 
 ------------------------------------------------------------------------
 

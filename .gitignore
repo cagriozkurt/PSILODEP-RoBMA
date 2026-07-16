@@ -36,17 +36,8 @@ tmp_*.jpg
 *_cache/
 *_files/
 
-manuscript_draft.md
-author_contact_email.md
+# Temporary files
 TODO.md
 
-# ── What IS tracked ───────────────────────────────────────────────────────────
-# (listed here for clarity — nothing below is a gitignore rule)
-#
-#  psilodep-robma.Rmd           — our RoBMA re-analysis (run with run_fresh=FALSE)
-#  ED_Table1_comprehensive_results.csv  — Extended Data Table 1
-#  fig1_robma_main.jpg          — Main Figure 1 (three-panel)
-#  fig_ED1_prior_sensitivity.jpg        — Extended Data Figure 1
-#  fig_ED2_dichotomous.jpg      — Extended Data Figure 2
-#  sypres.Rproj                 — R project file
-#  psilodep-robma-results.RData — RoBMA pre-computed model objects
+# Submission files
+submission/

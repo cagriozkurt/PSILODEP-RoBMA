@@ -1,0 +1,13 @@
+"study","condition_arm1","condition_arm2","multi_arm1","multi_arm2","n_arm1","n_arm2","n_total"
+"Back 2024","psil","ncn",NA,NA,15,15,30
+"Davis 2021","psil","wl",NA,NA,13,11,24
+"Goodwin 2022","psil","psil","25 mg","1 mg",79,79,158
+"Griffiths 2016","psil","psil","22 mg/kg","1 mg/kg",25,25,50
+"Lewis 2025","psil-mbsr","mbsr",NA,NA,12,10,22
+"Luquiens 2025","psil","psil","25 mg","1 mg",20,10,30
+"Raison 2023","psil","ncn",NA,NA,50,44,94
+"Rieser 2025","psil","pcb",NA,NA,18,19,37
+"Rosenblat 2024","psil","wl",NA,NA,16,14,30
+"Ross 2016","psil","ncn",NA,NA,12,14,26
+"Ross 2025","psil","ncn",NA,NA,14,18,32
+"von Rotz 2023","psil","pcb",NA,NA,26,26,52

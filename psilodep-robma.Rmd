@@ -309,7 +309,10 @@ prep_robma <- function(df) {
 }
 
 # Fit RoBMA with default PSMA preset and study-level effect sizes.
-run_robma <- function(df, seed = 4821, sample = 10000, burnin = 4000) {
+# chains = 3 is RoBMA's package default (verified via args(RoBMA) and against
+# the fitted object's fit_control$chains); set explicitly here so the MCMC
+# setting reported in the manuscript is pinned in code, not an implicit default.
+run_robma <- function(df, seed = 4821, sample = 10000, burnin = 4000, chains = 3) {
   RoBMA(
     yi      = df$g_pos,
     sei     = df$g_se,
@@ -318,6 +321,7 @@ run_robma <- function(df, seed = 4821, sample = 10000, burnin = 4000) {
     seed    = seed,
     sample  = sample,
     burnin  = burnin,
+    chains  = chains,
     silent  = TRUE
   )
 }
