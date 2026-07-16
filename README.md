@@ -8,15 +8,15 @@ This repository contains the full reproducibility code for an independent re-ana
 
 **Target paper:** 
 
-> Singleton SP, Sevchik BL, Lahey A, Cuijpers P, Harrer M, Jones MT, Nayak SM, Strain EC, Vandekar SN, Dworkin RH, Scott JC, & Satterthwaite TD. A living systematic review, meta-analysis and open-data resource of randomized controlled trials of psilocybin treatment for symptoms of depression. *Nature Mental Health* (2026).
+> Singleton SP, Sevchik BL, Lahey A, Cuijpers P, Harrer M, Jones MT, Nayak SM, Strain EC, Vandekar SN, Dworkin RH, Scott JC, & Satterthwaite TD. A living systematic review, meta-analysis and open-data resource of randomized controlled trials of psilocybin treatment for symptoms of depression. *Nature Mental Health* 4, 870–880 (2026). <https://doi.org/10.1038/s44220-026-00630-8>
 
-**Open dataset:** Singleton P, Harrer M & Sevchik B. `metapsy-project/data-depression-psiloctr`. Zenodo (2025). <https://doi.org/10.5281/zenodo.17657950>
+**Open dataset:** Singleton SP, Sevchik BL, Lahey A *et al.* `metapsy-project/data-depression-psiloctr`, Version 25.1.2 — pinned to the exact version cited in the published paper's own reference list. Zenodo (2025). <https://doi.org/10.5281/zenodo.15714852>
 
 ------------------------------------------------------------------------
 
 ## What we did
 
-Singleton et al. assessed publication bias using Egger's test (p = 0.21, non-significant) — a method with low power at k = 12 studies that provides no bias-corrected effect estimate. We applied **Robust Bayesian Meta-Analysis** (RoBMA; Maier, Bartoš & Wagenmakers, 2022) to the same open dataset using identical inclusion criteria.
+Singleton et al. assessed publication bias using Egger's test on their primary (12-study) model (intercept = −1.58, t = −1.34, p = 0.21, non-significant) — a method with low power at this sample size that provides no bias-corrected effect estimate. We applied **Robust Bayesian Meta-Analysis** (RoBMA; Maier, Bartoš & Wagenmakers, 2022) to the same open dataset and the same primary model (all 12 studies).
 
 RoBMA fits an ensemble of 12 models simultaneously varying effect presence, heterogeneity, and publication bias (via Vevea–Hedges step-weight functions and PET-PEESE), delivering Bayes Factors for each component and a model-averaged, bias-corrected posterior.
 
@@ -99,7 +99,7 @@ install.packages("RoBMA", type = "source")
 
 ## Seed
 
-All MCMC models use `seed = 4821`. Results may differ slightly across platforms due to JAGS compiler differences; the conclusions are robust to these variations. 15 of 17 models achieved R-hat ≤ 1.01 for μ; the open-label-exclusion (R-hat = 1.016) and Davis-2021-exclusion (R-hat = 1.010) subgroup models exceeded this threshold despite adequate effective sample size — see Extended Data Table 1 in the manuscript for full diagnostics.
+All MCMC models use `seed = 4821`. Results may differ slightly across platforms due to JAGS compiler differences; the conclusions are robust to these variations. 11 of 13 single-level models achieved R-hat ≤ 1.01 for μ; the exclude-open-label (R-hat = 1.016) and exclude-outliers (R-hat = 1.010) subgroup models exceeded this threshold despite adequate effective sample size — see Extended Data Table 1 in the manuscript for full diagnostics.
 
 ------------------------------------------------------------------------
 

@@ -11,19 +11,36 @@ This document provides a complete reproducibility guide for the Robust Bayesian
 Meta-Analysis (RoBMA) re-analysis of Singleton et al. (2026), submitted as a
 Matters Arising to *Nature Mental Health*.
 
-**Target paper:** Singleton SP, Sevchik BL, Lahey A, Cuijpers P, Harrer M,
-Jones MT, Nayak SM, Strain EC, Vandekar SN, Dworkin RH, Scott JC, &
-Satterthwaite TD. "A living systematic review, meta-analysis and open-data
-resource of randomized controlled trials of psilocybin treatment for symptoms
-of depression." *Nature Mental Health*, 2026.
+**Target paper:** Singleton, S. P. et al. A living systematic review,
+meta-analysis and open-data resource of randomized controlled trials of
+psilocybin treatment for symptoms of depression. *Nature Mental Health*
+**4**, 870–880 (2026). https://doi.org/10.1038/s44220-026-00630-8.
 
-**Dataset:** Openly available via `metapsyData::getData("depression-psiloctr")`.
-Zenodo DOI: [10.5281/zenodo.17657950](https://zenodo.org/records/17657950).
+**Important — published paper, not the medRxiv preprint.** An earlier version
+of this document was accidentally anchored to Singleton et al.'s medRxiv
+preprint (posted August 2025), not the peer-reviewed, published version above.
+Between preprint and publication the primary model grew from 9 to 12 studies
+(3 more RCTs were added: Lewis 2025, Luquiens 2025, Ross 2025) and the
+database grew from 12 to 15 studies total. Every number in this document is
+computed against the **published** paper's own dataset version and study
+composition — do not re-introduce the preprint's numbers.
+
+**Dataset:** Openly available via `metapsyData::getData("depression-psiloctr", version = "25.1.2")`.
+Version pinned to match the exact version cited in the published paper's own
+reference list ("Version 25.1.2", doi:10.5281/zenodo.15714852). Verified
+directly against the paper (`natmh2026.pdf`): this version's raw pull
+reproduces their reported 15-study database (Table 1) and their 12-study
+primary model exactly (same study list, same Hedges' g = −0.90 [−1.26, −0.55],
+tau2 = 0.12, n = 585 — matches to the decimal). Do not omit the version
+argument — `metapsyData` is a living database and defaults to "latest," which
+will keep growing as new trials are added.
 
 The analysis applies RoBMA (Maier, Bartoš & Wagenmakers, 2022, *Psychological
 Methods*) to the same dataset used by Singleton et al. RoBMA was not used in
 the original paper, which assessed publication bias using only Egger's test
-(p = 0.21, non-significant) and funnel plot inspection.
+on their primary model and funnel plot inspection (both non-significant; see
+the live-recomputed Egger's test below for exact statistics — this document
+never hardcodes numbers from the published paper).
 
 Full source code is maintained at: [github.com/metapsy-project/data-depression-psiloctr](https://github.com/metapsy-project/data-depression-psiloctr)
 
@@ -31,7 +48,7 @@ Full source code is maintained at: [github.com/metapsy-project/data-depression-p
 
 ## Computational note
 
-RoBMA fits 12 MCMC models per call. Running all 14 analyses from scratch takes
+RoBMA fits 12 MCMC models per call. Running all 17 analyses from scratch takes
 approximately 45–90 minutes depending on hardware. Set `run_fresh <- TRUE` in
 the setup chunk to recompute; leave as `FALSE` to load pre-computed results from
 `psilodep-robma-results.RData`.
@@ -49,8 +66,9 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ### What RoBMA adds
 
 Singleton et al. (2026) assessed publication bias via Egger's test and funnel
-plot inspection, finding no significant asymmetry (intercept = −1.58, p = 0.21).
-However, Egger's test has limited power with k = 12 studies and provides no
+plot inspection, finding no significant asymmetry on their primary model
+(exact statistics recomputed live below, not transcribed from the paper).
+However, Egger's test has limited power at this sample size and provides no
 bias-corrected effect estimate.
 
 RoBMA addresses both gaps by fitting an ensemble of 12 models that jointly vary
@@ -118,7 +136,7 @@ The dataset is identical to that used by Singleton et al. (2026). We perform
 the same quality checks they report.
 
 ```{r load-data}
-d    <- getData("depression-psiloctr")
+d    <- getData("depression-psiloctr", version = "25.1.2")  # pinned to the published paper's own dataset citation
 data <- d$data
 
 checkDataFormat(data)
@@ -165,6 +183,17 @@ cat("Studies:", paste(sort(unique(data_main$study)), collapse = ", "), "\n")
 
 ```{r filter-subgroups}
 # Subgroup analyses
+# "Diagnosis of MDD" subgroup. `diagnosis` values in this dataset are
+# "mdd"/"trd"/"dep"/"cancer"/"aud". Treatment-resistant depression (trd) is
+# clinically MDD-spectrum and is included; "dep" (used for the COVID-19
+# -related depression studies, Back 2024 and Lewis 2025 — a distinct
+# population per Table 1) is NOT. Verified against every reported statistic
+# in the published paper, not just k: diagnosis %in% c("mdd","trd") gives
+# k=5 (Davis 2021, Goodwin 2022, Raison 2023, Rosenblat 2024, von Rotz 2023),
+# n=358, g=-0.93 [-1.87, 0.01], tau2=0.33 — an exact match to the decimal.
+# (Two earlier, wrong attempts: "dep"|"trd" gives the right k on an older,
+# smaller dataset by coincidence; "dep"|"mdd" gives the right k here but the
+# wrong g/n, because it swaps in the wrong two studies.)
 data_dep <- data_main |>
   filterPoolingData(diagnosis == "mdd" | diagnosis == "trd")
 
@@ -262,18 +291,23 @@ data_remission <- data |>
   )
 
 # Convenience summary
-# Multi-timepoint data for multilevel RoBMA:
-# Same as data_main but WITHOUT primary_timepoint == "1",
-# so all follow-up timepoints per study are retained (k = 37).
+# Multi-timepoint data for multilevel RoBMA — matches the CHE model's
+# data_time in Singleton et al.'s own psilodep-meta-analysis.Rmd exactly,
+# including their unscoped 10-mg exclusion (applied to all rows, not just
+# Goodwin 2022 — verified only Goodwin 2022 has "10 mg" in multi_arm1/2 on
+# this pinned dataset, so this is equivalent in effect to scoping it, but
+# matching their literal filter here rather than an equivalent-but-different
+# one removes any structural ambiguity).
 data_time <- data |>
   filterPoolingData(
-    primary_instrument == "1",
-    is.na(post_crossover) | !Detect(post_crossover, "1"),
-    outcome_type == "msd" | outcome_type == "imsd",
-    !(Detect(study, "Goodwin 2022") & (!is.na(multi_arm1)) & Detect(multi_arm1, "10 mg")),
-    !(Detect(study, "Goodwin 2022") & (!is.na(multi_arm2)) & Detect(multi_arm2, "10 mg")),
+    is.na(multi_arm1) | !Detect(multi_arm1, "10 mg"),
+    is.na(multi_arm2) | !Detect(multi_arm2, "10 mg"),
     !Detect(study, "Krempien 2023"),
-    !Detect(study, "Carhart-Harris 2021")
+    !Detect(study, "Carhart-Harris 2021"),
+    primary_instrument == "1",
+    time_days > 0,
+    is.na(post_crossover) | !Detect(post_crossover, "1"),
+    outcome_type == "msd" | outcome_type == "imsd"
   )
 cat("data_time: k =", nrow(data_time), "effect sizes from",
     n_distinct(data_time$study), "studies\n")
@@ -299,6 +333,16 @@ purrr::map_int(datasets, \(df) n_distinct(df$study))
 ## Helper Functions
 
 ```{r helpers}
+# Bayes Factor interpretation label (Jeffreys 1961; Kass & Raftery 1995) —
+# computed from the value, never asserted as static prose.
+bf_label <- function(bf) {
+  if (bf < 1)       "favours the null"
+  else if (bf < 3)  "anecdotal"
+  else if (bf < 10) "moderate"
+  else if (bf < 30) "strong"
+  else              "very strong / decisive"
+}
+
 # Prepare a data_* frame for RoBMA input.
 # Negates .g so positive = psilocybin beneficial (required for PSMA prior).
 prep_robma <- function(df) {
@@ -349,6 +393,8 @@ extract_robma <- function(fit, label, k, pub_g = NA, pub_lo = NA, pub_hi = NA) {
     Analysis    = label,
     k           = k,
     `Pub. g`    = round(pub_g, 2),
+    pub_lo_n    = round(pub_lo, 2),  # numeric, for figure code — never re-type a positional vector
+    pub_hi_n    = round(pub_hi, 2),
     `Pub. CI`   = if (!is.na(pub_lo))
                     sprintf("[%.2f, %.2f]", pub_lo, pub_hi)
                   else NA_character_,
@@ -357,6 +403,8 @@ extract_robma <- function(fit, label, k, pub_g = NA, pub_lo = NA, pub_hi = NA) {
     BF_pb       = round(bf_pb,     2),
     PP_pb       = round(pp_pb,     2),
     mu_median   = round(mu_med,    2),
+    mu_lo_n     = round(mu_lo, 2),
+    mu_hi_n     = round(mu_hi, 2),
     mu_CrI      = sprintf("[%.2f, %.2f]", mu_lo, mu_hi),
     Attenuation = if (!is.na(pub_g) && pub_g != 0)
                     sprintf("%.0f%%", (1 - mu_med / pub_g) * 100)
@@ -370,12 +418,179 @@ extract_robma <- function(fit, label, k, pub_g = NA, pub_lo = NA, pub_hi = NA) {
 
 ---
 
+## Published Comparator Values — Live Recomputation
+
+**No hardcoded values from the paper.** Every "published" g / RR value used
+anywhere in this document is computed here, live, on this same pinned dataset,
+using the exact `metapsyTools::runMetaAnalysis` specification from Singleton
+et al.'s own reproducibility script (`psilodep-meta-analysis.Rmd`, their
+primary/subgroup/sensitivity/CHE/dichotomous chunks). Nothing below is
+transcribed from the PDF, a table, or a prior session — every number is
+produced by fitting the frequentist model fresh, right now, on the pinned
+25.1.2 data. If the pinned version ever changes, these update automatically;
+if the paper PDF is wrong, incomplete, or unavailable, this section still
+works, because it never reads the paper at all — it re-runs their analysis.
+
+```{r freq-replication}
+# Common runMetaAnalysis spec for continuous (g) outcomes — verbatim from
+# Singleton et al.'s psilodep-meta-analysis.Rmd (main_results / dep / excol /
+# rob / parallel / crossover / expanded / outliers / g10 / clinician /
+# selfreport chunks all share this specification).
+run_freq_g <- function(df) {
+  runMetaAnalysis(df,
+    which.run = "overall", es.measure = "g", method.tau = "REML",
+    method.tau.ci = "Q-Profile", hakn = TRUE,
+    study.var = "study", arm.var.1 = "condition_arm1", arm.var.2 = "condition_arm2",
+    measure.var = "instrument", w1.var = "n_arm1", w2.var = "n_arm2",
+    time.var = "time_weeks", round.digits = 2)
+}
+
+# Common spec for dichotomous (RR) outcomes — verbatim from their
+# response/remission chunks.
+run_freq_rr <- function(df) {
+  runMetaAnalysis(df,
+    which.run = "overall", es.measure = "RR", es.type = "raw",
+    method.tau = "PM", method.tau.ci = "Q-Profile", hakn = TRUE,
+    study.var = "study", arm.var.1 = "condition_arm1", arm.var.2 = "condition_arm2",
+    measure.var = "instrument", w1.var = "n_arm1", w2.var = "n_arm2",
+    time.var = "time_weeks", round.digits = 2)
+}
+
+# Extract g/CI from a metapsyTools continuous result, flipped to this
+# document's positive-g convention (metapsyTools reports negative = benefit).
+extract_freq_g <- function(res) {
+  m <- res$model.overall
+  c(g = round(-m$TE.random, 2), lo = round(-m$upper.random, 2), hi = round(-m$lower.random, 2))
+}
+
+# Same, but for a fixed-effect (method.tau = "FE") fit — the model object
+# stores the fixed-effect estimate under *.fixed, not *.random.
+extract_freq_g_fe <- function(res) {
+  m <- res$model.overall
+  c(g = round(-m$TE.fixed, 2), lo = round(-m$upper.fixed, 2), hi = round(-m$lower.fixed, 2))
+}
+
+# Extract RR/CI from a metapsyTools dichotomous result (already on the
+# "higher = more response/remission with psilocybin" scale; no sign flip).
+extract_freq_rr <- function(res) {
+  m <- res$model.overall
+  c(g = round(exp(m$TE.random), 2), lo = round(exp(m$lower.random), 2), hi = round(exp(m$upper.random), 2))
+}
+
+freq_main        <- run_freq_g(data_main)
+freq_expanded    <- run_freq_g(data_expanded)
+freq_dep         <- run_freq_g(data_dep)
+freq_excol       <- run_freq_g(data_excol)
+freq_rob         <- run_freq_g(data_rob)
+freq_parallel    <- run_freq_g(data_parallel)
+freq_crossover   <- run_freq_g(data_crossover)
+freq_g10         <- run_freq_g(data_g10)
+freq_clinician   <- run_freq_g(data_clinician)
+freq_selfreport  <- run_freq_g(data_selfreport)
+freq_outliers    <- run_freq_g(data_outliers)
+freq_response    <- run_freq_rr(data_response)
+freq_remission   <- run_freq_rr(data_remission)
+
+# Fixed-effect sensitivity — verbatim spec from their `fixed` chunk
+# (method.tau <- "FE"; hakn <- FALSE, same data as the primary model). RoBMA
+# doesn't need a separate fit for this: BF_het (in the primary model output)
+# is itself the fixed-vs-random evidence. This comparator is reported
+# alongside the primary RoBMA fit's own BF/mu values, not a new posterior.
+freq_fixed <- runMetaAnalysis(data_main,
+  which.run = "overall", es.measure = "g", method.tau = "FE",
+  method.tau.ci = "Q-Profile", hakn = FALSE,
+  study.var = "study", arm.var.1 = "condition_arm1", arm.var.2 = "condition_arm2",
+  measure.var = "instrument", w1.var = "n_arm1", w2.var = "n_arm2",
+  time.var = "time_weeks", round.digits = 2)
+
+# Individual study effect size (Davis 2021), for the outlier discussion below
+# — pulled from the data, not typed in.
+davis_g <- -(data_main |> filter(Detect(study, "Davis 2021")) |> pull(.g) |> unique())
+
+# I^2 for the dichotomous fixed-vs-random comparison, checked live rather than
+# asserted from the paper.
+resp_i2    <- round(freq_response$model.overall$I2 * 100, 1)
+remiss_i2  <- round(freq_remission$model.overall$I2 * 100, 1)
+
+# data_main is Singleton et al.'s actual published primary model (12 studies)
+# — verified to match their reported g/CI/tau2/n exactly. No separate
+# "robustness check" against a different primary is needed anymore.
+pub_primary     <- extract_freq_g(freq_main)
+pub_expanded    <- extract_freq_g(freq_expanded)    # their "expanded inclusion criteria" sensitivity, k=15
+pub_dep         <- extract_freq_g(freq_dep)
+pub_excol       <- extract_freq_g(freq_excol)
+pub_rob         <- extract_freq_g(freq_rob)
+pub_parallel    <- extract_freq_g(freq_parallel)
+pub_crossover   <- extract_freq_g(freq_crossover)
+pub_g10         <- extract_freq_g(freq_g10)
+pub_clinician   <- extract_freq_g(freq_clinician)
+pub_selfreport  <- extract_freq_g(freq_selfreport)
+pub_outliers    <- extract_freq_g(freq_outliers)
+pub_response    <- extract_freq_rr(freq_response)
+pub_remission   <- extract_freq_rr(freq_remission)
+pub_fixed       <- extract_freq_g_fe(freq_fixed)
+
+# Three-level CHE model — verbatim spec from their `che` chunk, fit on
+# data_time (k=37 effect sizes from the same 12 studies as their primary model).
+freq_che <- runMetaAnalysis(data_time,
+  which.run = "threelevel.che", es.measure = "g", method.tau = "REML",
+  method.tau.ci = "Q-Profile", hakn = TRUE,
+  study.var = "study", arm.var.1 = "condition_arm1", arm.var.2 = "condition_arm2",
+  measure.var = "instrument", w1.var = "n_arm1", w2.var = "n_arm2",
+  time.var = "time_days", round.digits = 2)
+.che_fit <- freq_che$model.threelevel.che
+pub_multilevel <- c(g = round(-as.numeric(.che_fit$b[1]), 2),
+                     lo = round(-as.numeric(.che_fit$ci.ub), 2),
+                     hi = round(-as.numeric(.che_fit$ci.lb), 2))
+
+# Meta-regression on time since final dose — verbatim spec from their
+# `meta-regression` chunk (`metaRegression(time_results$model.threelevel.che,
+# ~time_days)`), live on freq_che.
+che_timereg <- metaRegression(freq_che$model.threelevel.che, ~time_days)
+che_timereg_beta <- round(as.numeric(che_timereg$b[2]), 4)
+che_timereg_p    <- round(as.numeric(che_timereg$pval[2]), 3)
+
+# Egger's test on the primary model — live, referenced in the Overview text
+# and in the dedicated Egger's-test section below.
+egger_primary <- eggers.test(freq_main$model.overall)
+
+results_table_pub_summary <- tibble(
+  Analysis = c(sprintf("Primary (k=%d)", n_distinct(data_main$study)),
+               sprintf("Expanded inclusion criteria (k=%d)", n_distinct(data_expanded$study)),
+               "Diagnosis", "Excl. open-label",
+               "Excl. high RoB", "Parallel", "Crossover", "Goodwin 10mg", "Clinician-rated",
+               "Self-report", "Excl. Davis 2021", "Response (RR)", "Remission (RR)", "Multilevel CHE"),
+  g_or_RR  = c(pub_primary["g"], pub_expanded["g"], pub_dep["g"], pub_excol["g"], pub_rob["g"],
+               pub_parallel["g"], pub_crossover["g"], pub_g10["g"], pub_clinician["g"],
+               pub_selfreport["g"], pub_outliers["g"], pub_response["g"], pub_remission["g"], pub_multilevel["g"]),
+  CI = c(sprintf("[%.2f, %.2f]", pub_primary["lo"], pub_primary["hi"]),
+         sprintf("[%.2f, %.2f]", pub_expanded["lo"], pub_expanded["hi"]),
+         sprintf("[%.2f, %.2f]", pub_dep["lo"], pub_dep["hi"]),
+         sprintf("[%.2f, %.2f]", pub_excol["lo"], pub_excol["hi"]),
+         sprintf("[%.2f, %.2f]", pub_rob["lo"], pub_rob["hi"]),
+         sprintf("[%.2f, %.2f]", pub_parallel["lo"], pub_parallel["hi"]),
+         sprintf("[%.2f, %.2f]", pub_crossover["lo"], pub_crossover["hi"]),
+         sprintf("[%.2f, %.2f]", pub_g10["lo"], pub_g10["hi"]),
+         sprintf("[%.2f, %.2f]", pub_clinician["lo"], pub_clinician["hi"]),
+         sprintf("[%.2f, %.2f]", pub_selfreport["lo"], pub_selfreport["hi"]),
+         sprintf("[%.2f, %.2f]", pub_outliers["lo"], pub_outliers["hi"]),
+         sprintf("[%.2f, %.2f]", pub_response["lo"], pub_response["hi"]),
+         sprintf("[%.2f, %.2f]", pub_remission["lo"], pub_remission["hi"]),
+         sprintf("[%.2f, %.2f]", pub_multilevel["lo"], pub_multilevel["hi"]))
+)
+results_table_pub_summary
+```
+
+---
+
 ## RoBMA Analyses
 
 ```{r run-or-load}
 if (run_fresh) {
 
   # ── Primary model ────────────────────────────────────────────────────────
+  # Primary = data_main = Singleton et al.'s own published primary model
+  # (12 studies) — verified to reproduce their reported g/CI/tau2/n exactly.
   set.seed(4821)
   robma_primary <- run_robma(prep_robma(data_main))
 
@@ -392,8 +607,8 @@ if (run_fresh) {
 
   # ── Sensitivity models ───────────────────────────────────────────────────
   sensitivity_datasets <- list(
-    g10        = data_g10,
     expanded   = data_expanded,
+    g10        = data_g10,
     clinician  = data_clinician,
     selfreport = data_selfreport,
     outliers   = data_outliers
@@ -462,7 +677,7 @@ if (run_fresh) {
                       seed = 4821, sample = 10000, burnin = 4000, silent = TRUE)
   )
 
-  # ── Multilevel RoBMA (k = 37, 12 clusters) ───────────────────────────────
+  # ── Multilevel RoBMA (data_time: all timepoints, same 12 primary studies) ─
   # RoBMA 4.0.0 cluster argument — Bartoš, Maier & Wagenmakers (2026)
   ml_input_fresh <- data_time |>
     select(study, .g, .g_se) |>
@@ -499,6 +714,29 @@ if (run_fresh) {
 
 ```{r primary-summary}
 summary(robma_primary)
+
+# Extracted once here; referenced by inline `r` throughout this section and
+# the next, so prose numbers can never drift from the fitted object.
+.ps   <- summary(robma_primary)$inclusion_components
+.pe   <- summary(robma_primary)$estimates
+p_bf_effect <- round(.ps$inclusion_BF[1], 2)
+p_bf_het    <- round(.ps$inclusion_BF[2], 2)
+p_bf_pb     <- round(.ps$inclusion_BF[3], 2)
+p_pp_pb     <- round(.ps$post_prob[3], 2)
+p_mu_med    <- round(.pe[1, "0.5"], 2)
+p_mu_lo     <- round(.pe[1, "0.025"], 2)
+p_mu_hi     <- round(.pe[1, "0.975"], 2)
+
+# Omega (weight function) CrI lower-bound range across p-value intervals —
+# for the "Weight function interpretation" prose below.
+.bias_est   <- summary(robma_primary)$estimates_bias
+omega_lo_min <- round(min(.bias_est[2:6, "0.025"]), 2)
+omega_lo_max <- round(max(.bias_est[2:6, "0.025"]), 2)
+omega_med_min <- round(min(.bias_est[2:6, "0.5"]), 2)
+omega_med_max <- round(max(.bias_est[2:6, "0.5"]), 2)
+omega_all_at_ceiling <- all(.bias_est[2:6, "0.5"] == 1)
+pet_med   <- round(.bias_est["PET",   "0.5"], 2)
+peese_med <- round(.bias_est["PEESE", "0.5"], 2)
 ```
 
 The primary RoBMA analysis yields three component Bayes Factors:
@@ -516,25 +754,27 @@ The primary RoBMA analysis yields three component Bayes Factors:
 | 10 – 30 | Strong evidence |
 | > 30 | Very strong / decisive |
 
-BF_pb = 3.90 falls in the moderate range. It meaningfully updates the prior
-probability of publication bias from 0.50 to 0.80, but is not decisive. Overstatement
-of this finding is a primary risk to guard against.
+BF_pb = `r p_bf_pb` falls in the **`r bf_label(p_bf_pb)`** range. It
+updates the prior probability of publication bias from 0.50 to `r p_pp_pb`.
+Overstatement of this finding is a primary risk to guard against.
 
-The model-averaged, bias-corrected posterior for μ should be compared directly
-to the published frequentist estimate of g = 0.90 [0.55, 1.26].
+The model-averaged, bias-corrected posterior for μ (`r p_mu_med` [`r p_mu_lo`,
+`r p_mu_hi`]) should be compared directly to Singleton et al.'s own published
+primary model, g = `r pub_primary["g"]` [`r pub_primary["lo"]`, `r pub_primary["hi"]`],
+k = `r n_distinct(data_main$study)` — the same `r n_distinct(data_main$study)`-study
+population used here. (Their "expanded inclusion criteria" sensitivity check,
+using all `r n_distinct(data_expanded$study)` studies in the open database, is
+reported alongside the other sensitivity analyses below: g = `r pub_expanded["g"]`
+[`r pub_expanded["lo"]`, `r pub_expanded["hi"]`].)
 
-**BF_het and the fixed-effects comparison:** BF_het = 1.75 constitutes only
-anecdotal evidence for heterogeneity. This is consistent with the original
-fixed-effects model (g = 0.84 [1.02, 0.67]), which was nearly identical to
-the REML random-effects estimate (g = 0.90). RoBMA's internal comparison of
-fixed vs random models captures what the original FE sensitivity analysis showed
-— without requiring a separate model fit.
+**BF_het:** BF_het = `r p_bf_het`.
 
 ```{r primary-posterior-plot}
 plot(robma_primary, parameter = "mu", prior = TRUE,
      main = "Posterior of μ (model-averaged) vs prior")
-abline(v = 0.90, col = "firebrick", lty = 2, lwd = 1.5)
-legend("topleft", legend = "Published g = 0.90 (Singleton et al., 2026)",
+abline(v = pub_primary["g"], col = "firebrick", lty = 2, lwd = 1.5)
+legend("topleft",
+       legend = sprintf("Published g = %.2f (Singleton et al., 2026, primary model)", pub_primary["g"]),
        col = "firebrick", lty = 2, bty = "n", cex = 0.85)
 ```
 
@@ -543,16 +783,17 @@ plot(robma_primary, parameter = "weightfunction",
      main = "Model-averaged publication bias weight function (ω)")
 ```
 
-**Weight function interpretation:** All ω posterior medians sit at 1.0 (maximum
-publication probability), with credible intervals extending down to ~0.19–0.44 for
-the non-significant p-value ranges. This does not mean "no bias" — it means the
+**Weight function interpretation:** `r if (omega_all_at_ceiling) "All ω posterior medians sit at 1.0 (maximum publication probability)" else sprintf("ω posterior medians range %.2f–%.2f (not uniformly at the ceiling)", omega_med_min, omega_med_max)`,
+with credible intervals extending down to
+`r omega_lo_min`–`r omega_lo_max` for the non-significant p-value ranges. This
+does not mean "no bias" — it means the
 data are consistent with either no bias or moderate bias, and the model averaging
-(BF_pb = 3.90) is what shifts the posterior toward bias being present. The diffuse
-ω posteriors indicate that the specific *form* of bias is uncertain; the model
-averages over all specified weight function shapes.
+(BF_pb = `r p_bf_pb`) is what shifts the posterior toward bias being present. The
+diffuse ω posteriors indicate that the specific *form* of bias is uncertain; the
+model averages over all specified weight function shapes.
 
-**PET and PEESE posteriors:** Both are centred near zero (PET median ≈ 0,
-PEESE median ≈ 0), with wide credible intervals. This indicates that neither
+**PET and PEESE posteriors:** PET median = `r pet_med`, PEESE median =
+`r peese_med`, both with wide credible intervals. This indicates that neither
 funnel-plot-based bias mechanism is individually supported — bias evidence in the
 primary model comes from the weight function models, not from PET-PEESE. This is
 an important nuance for the manuscript: BF_pb is not driven by a simple
@@ -561,22 +802,16 @@ small-study effect.
 ### Comparison with Egger's test
 
 ```{r egger-comparison}
-# Singleton et al.'s original publication bias assessment used Egger's test
-# Re-run frequentist primary model for Egger's test comparison
-main_results_freq <- runMetaAnalysis(data_main,
-  which.run = "overall", es.measure = "g", method.tau = "REML",
-  method.tau.ci = "Q-Profile", hakn = TRUE,
-  study.var = "study", arm.var.1 = "condition_arm1", arm.var.2 = "condition_arm2",
-  measure.var = "instrument", w1.var = "n_arm1", w2.var = "n_arm2",
-  time.var = "time_weeks", round.digits = 2)
+# Egger's test on the primary model, computed live — nothing quoted from the
+# paper. (data_main is Singleton et al.'s own published primary model, so
+# this is directly their Egger's test, not a separate re-analysis of it.)
+cat(sprintf("Primary model (k=%d) — Egger's test:\n", n_distinct(data_main$study)))
+print(egger_primary)
 
-eggers.test(main_results_freq$model.overall)
-
-cat("\nEgger's test: p = 0.21 (non-significant with k = 12)\n")
-cat("RoBMA BF_pb =", round(summary(robma_primary)$inclusion_components$inclusion_BF[3], 2),
-    "(posterior probability =",
-    round(summary(robma_primary)$inclusion_components$post_prob[3], 2), ")\n")
-cat("\nNote: Egger's test has low power at k = 12.\n",
+egger_p <- egger_primary$p[1]
+cat(sprintf("\nEgger's test (k=%d): p = %.4f\n", n_distinct(data_main$study), egger_p))
+cat("RoBMA BF_pb =", p_bf_pb, "(posterior probability =", p_pp_pb, ")\n")
+cat("\nNote: Egger's test has low power at this sample size.\n",
     "RoBMA's model-averaging approach is more sensitive to weak bias signals.\n")
 ```
 
@@ -620,9 +855,11 @@ BF_pb ranges `r round(min(prior_table$BF_pb), 2)`–`r round(max(prior_table$BF_
 **Heterogeneity prior:** The default InvGamma(1, 0.15) prior for τ places most
 mass below τ = 1, which is reasonable for standardised effect size differences.
 An alternative InvGamma(1, 0.25) (more diffuse) was considered but not separately
-run; given that BF_het = 1.75 (weak evidence for heterogeneity) and τ posteriors
-are dominated by the data at k = 12, heterogeneity prior sensitivity is expected
-to be lower than effect prior sensitivity and is not a primary concern here.
+run; given that BF_het = `r p_bf_het` (`r bf_label(p_bf_het)` evidence for
+heterogeneity) and τ posteriors are dominated by the data at
+k = `r n_distinct(data_expanded$study)`, heterogeneity prior sensitivity is
+expected to be lower than effect prior sensitivity and is not a primary
+concern here.
 
 ---
 
@@ -634,19 +871,25 @@ should be interpreted with caution.
 
 ```{r subgroup-results}
 pub_vals <- list(
-  dep       = c(g = 0.93, lo = 0.00, hi = 1.87),
-  parallel  = c(g = 0.80, lo = 0.49, hi = 1.11),
-  crossover = c(g = 1.04, lo = 0.03, hi = 2.06),
-  excol     = c(g = 0.81, lo = 0.60, hi = 1.03),
-  rob       = c(g = 0.97, lo = 0.57, hi = 1.38)
+  dep       = pub_dep,
+  parallel  = pub_parallel,
+  crossover = pub_crossover,
+  excol     = pub_excol,
+  rob       = pub_rob
 )
 
+# Labels build their k-count from the actual filtered dataset, never typed —
+# this is exactly the class of bug that broke the original submission.
+label_k <- function(base, nm) {
+  k <- n_distinct(datasets[[nm]]$study)
+  sprintf("%s (k=%d)%s", base, k, if (k < 8) " ⚠" else "")
+}
 labels <- list(
-  dep       = "MDD/TRD diagnosis (k=5) ⚠",
-  parallel  = "Parallel design (k=7)",
-  crossover = "Crossover only (k=5) ⚠",
-  excol     = "Excl. open-label (k=9)",
-  rob       = "Excl. high RoB (k=9)"
+  dep       = label_k("MDD/TRD diagnosis", "dep"),
+  parallel  = label_k("Parallel design", "parallel"),
+  crossover = label_k("Crossover only", "crossover"),
+  excol     = label_k("Excl. open-label", "excol"),
+  rob       = label_k("Excl. high RoB", "rob")
 )
 
 subgroup_table <- purrr::imap_dfr(robma_subgroups, \(fit, nm) {
@@ -662,18 +905,35 @@ subgroup_table |>
 ### Key subgroup finding: open-label studies drive the bias signal
 
 ```{r open-label-comparison}
+bf_excol_val <- subgroup_table$BF_pb[grepl("open-label", subgroup_table$Analysis)]
+bf_parallel_val <- subgroup_table$BF_pb[grepl("Parallel", subgroup_table$Analysis)]
+
 cat("Publication bias Bayes Factors by design:\n\n")
-cat(sprintf("  Excl. open-label (k=9): BF_pb = %.2f  → no bias evidence\n",
-    subgroup_table$BF_pb[subgroup_table$Analysis == "Excl. open-label (k=9)"]))
-cat(sprintf("  Parallel design  (k=7): BF_pb = %.2f  → minimal bias evidence\n",
-    subgroup_table$BF_pb[subgroup_table$Analysis == "Parallel design (k=7)"]))
-cat(sprintf("  Primary model   (k=12): BF_pb = %.2f  → moderate bias evidence\n",
-    summary(robma_primary)$inclusion_components$inclusion_BF[3]))
-cat("\nInterpretation: When open-label and crossover studies are removed,\n")
-cat("publication bias evidence largely disappears. The bias signal in the\n")
-cat("primary model appears driven by open-label designs — consistent with\n")
-cat("the functional unblinding concern rather than file-drawer suppression\n")
-cat("of blinded RCTs.\n")
+cat(sprintf("  %s: BF_pb = %.2f (%s)\n",
+    subgroup_table$Analysis[grepl("open-label", subgroup_table$Analysis)],
+    bf_excol_val, bf_label(bf_excol_val)))
+cat(sprintf("  %s: BF_pb = %.2f (%s)\n",
+    subgroup_table$Analysis[grepl("Parallel", subgroup_table$Analysis)],
+    bf_parallel_val, bf_label(bf_parallel_val)))
+cat(sprintf("  Primary model (k=%d): BF_pb = %.2f (%s)\n",
+    n_distinct(data_expanded$study), p_bf_pb, bf_label(p_bf_pb)))
+
+# The "drops when open-label/parallel-only excluded" claim is only asserted if
+# the numbers actually show it — computed, not stated on faith.
+signal_drops <- bf_excol_val < p_bf_pb && bf_parallel_val < p_bf_pb
+cat(sprintf("\nInterpretation: bias evidence is %s when open-label studies are\n",
+    if (signal_drops) "lower" else "NOT lower"))
+if (signal_drops) {
+  cat("excluded (and in the parallel-only subset) than in the primary model —\n")
+  cat("consistent with the bias signal being attributable to open-label designs\n")
+  cat("(functional unblinding) rather than file-drawer suppression of blinded\n")
+  cat("RCTs generally. Re-examine this framing if the pattern above does not\n")
+  cat("hold on a future rerun.\n")
+} else {
+  cat("excluded than in the primary model. The 'open-label designs drive the\n")
+  cat("signal' framing used elsewhere in this document does NOT hold for the\n")
+  cat("current fit and must be revised before submission.\n")
+}
 ```
 
 ---
@@ -682,27 +942,31 @@ cat("of blinded RCTs.\n")
 
 ```{r sensitivity-results}
 pub_vals_sens <- list(
-  g10        = c(g = 0.87, lo = 0.47, hi = 1.27),
-  expanded   = c(g = 0.88, lo = 0.56, hi = 1.21),
-  clinician  = c(g = 1.02, lo = 0.44, hi = 1.60),
-  selfreport = c(g = 1.00, lo = 0.31, hi = 1.68),
-  outliers   = c(g = 0.81, lo = 0.55, hi = 1.07)
-)
-
-labels_sens <- list(
-  g10        = "Goodwin 10 mg arm (k=12)",
-  expanded   = "Expanded inclusion (k=15)",
-  clinician  = "Clinician-rated (k=7)",
-  selfreport = "Self-report (k=9) †",
-  outliers   = "Excl. Davis 2021 (k=11)"
+  expanded   = pub_expanded,
+  g10        = pub_g10,
+  clinician  = pub_clinician,
+  selfreport = pub_selfreport,
+  outliers   = pub_outliers
 )
 
 datasets_sens <- list(
-  g10        = data_g10,
   expanded   = data_expanded,
+  g10        = data_g10,
   clinician  = data_clinician,
   selfreport = data_selfreport,
   outliers   = data_outliers
+)
+
+label_k_sens <- function(base, nm, marker = "") {
+  k <- n_distinct(datasets_sens[[nm]]$study)
+  sprintf("%s (k=%d)%s%s", base, k, marker, if (k < 8) " ⚠" else "")
+}
+labels_sens <- list(
+  expanded   = label_k_sens("Expanded inclusion criteria", "expanded"),
+  g10        = label_k_sens("Goodwin 10 mg arm", "g10"),
+  clinician  = label_k_sens("Clinician-rated", "clinician"),
+  selfreport = label_k_sens("Self-report", "selfreport", marker = " †"),
+  outliers   = label_k_sens("Excl. Davis 2021", "outliers")
 )
 
 sensitivity_table <- purrr::imap_dfr(robma_sensitivity, \(fit, nm) {
@@ -716,9 +980,11 @@ sensitivity_table |>
 ```
 
 **† Self-report BF_pb = `r sensitivity_table$BF_pb[grepl("Self-report", sensitivity_table$Analysis)]`:**
-This is a degenerate or near-degenerate estimate. With k = 9 and I² = 73%, the
-weight function models become numerically extreme. Do not report at face value;
-treat as "BF_pb ≫ 100, unreliable" in any summary table.
+k = `r n_distinct(data_selfreport$study)`, non-significant (g = `r pub_selfreport["g"]` [`r pub_selfreport["lo"]`,
+`r pub_selfreport["hi"]`]), substantial heterogeneity. BF_pb this extreme at
+this small a k is a signature of a numerically degenerate weight-function fit,
+not strong evidence of bias in self-report outcomes specifically — do not
+report at face value.
 
 **Goodwin 10 mg (BF_pb = `r sensitivity_table$BF_pb[grepl("Goodwin", sensitivity_table$Analysis)]`):**
 Using the 10 mg arm (genuinely lower dose-response) conflates lower efficacy
@@ -726,8 +992,9 @@ with publication bias. Interpret with caution; not straightforwardly comparable
 to the primary model.
 
 **Davis 2021 (Excl. Davis 2021: BF_pb = `r sensitivity_table$BF_pb[grepl("Davis", sensitivity_table$Analysis)]`):**
-When the outlier (g = 2.48) is excluded, publication bias evidence drops to
-near-zero. Davis 2021 appears to be a secondary driver of the bias signal.
+When the outlier (g = `r round(davis_g, 2)`) is excluded, publication bias
+evidence drops to `r bf_label(sensitivity_table$BF_pb[grepl("Davis", sensitivity_table$Analysis)])`.
+Davis 2021 appears to be a secondary driver of the bias signal.
 
 ---
 
@@ -743,10 +1010,14 @@ extract_dich <- function(fit, label, k, pub_RR, pub_lo, pub_hi) {
   tibble(
     Analysis    = label, k = k,
     `Pub. RR`   = round(pub_RR, 2),
+    pub_lo_n    = round(pub_lo, 2),
+    pub_hi_n    = round(pub_hi, 2),
     `Pub. CI`   = sprintf("[%.2f, %.2f]", pub_lo, pub_hi),
     BF_effect   = round(comp$inclusion_BF[1], 2),
     BF_pb       = round(comp$inclusion_BF[3], 2),
     `RoBMA RR`  = round(exp(mu), 2),
+    mu_lo_n     = round(exp(est[1, "0.025"]), 2),
+    mu_hi_n     = round(exp(est[1, "0.975"]), 2),
     `RoBMA CrI` = sprintf("[%.2f, %.2f]",
                           exp(est[1, "0.025"]), exp(est[1, "0.975"])),
     Attenuation = sprintf("%.0f%%", (1 - exp(mu) / pub_RR) * 100),
@@ -754,24 +1025,42 @@ extract_dich <- function(fit, label, k, pub_RR, pub_lo, pub_hi) {
   )
 }
 
+.k_resp   <- n_distinct(data_response$study)
+.k_remiss <- n_distinct(data_remission$study)
 dich_table <- bind_rows(
-  extract_dich(robma_response,  "Response (k=5) ⚠",  5, 2.77, 1.93, 3.97),
-  extract_dich(robma_remission, "Remission (k=6) ⚠", 6, 4.04, 3.39, 4.82)
+  extract_dich(robma_response,  sprintf("Response (k=%d)%s", .k_resp, if (.k_resp < 8) " ⚠" else ""),
+               .k_resp, pub_response["g"], pub_response["lo"], pub_response["hi"]),
+  extract_dich(robma_remission, sprintf("Remission (k=%d)%s", .k_remiss, if (.k_remiss < 8) " ⚠" else ""),
+               .k_remiss, pub_remission["g"], pub_remission["lo"], pub_remission["hi"])
 )
 
 dich_table
+
+# BF_het / tau for both dichotomous fits, for the FE-vs-RE sentence below —
+# checked live rather than asserted.
+.resp_s   <- summary(robma_response)
+.remiss_s <- summary(robma_remission)
+resp_bf_het    <- round(.resp_s$inclusion_components$inclusion_BF[2], 2)
+remiss_bf_het  <- round(.remiss_s$inclusion_components$inclusion_BF[2], 2)
+resp_tau_med   <- round(.resp_s$estimates[2, "0.5"], 3)
+remiss_tau_med <- round(.remiss_s$estimates[2, "0.5"], 3)
 ```
 
-Both dichotomous outcomes show modest attenuation (17% and 21%) relative to
-published risk ratios. The effect remains clearly positive for remission
-(BF_effect = `r dich_table$BF_effect[2]`) with weaker publication bias evidence
-(BF_pb = `r dich_table$BF_pb[2]`). ⚠ k = 5–6; bias estimation has limited power.
+Attenuation and BF_pb for both dichotomous outcomes relative to Singleton et
+al.'s published fixed-effects risk ratios (response: RR = `r pub_response["g"]`
+[`r pub_response["lo"]`, `r pub_response["hi"]`], k=`r .k_resp`; remission: RR =
+`r pub_remission["g"]` [`r pub_remission["lo"]`, `r pub_remission["hi"]`], k=`r .k_remiss`)
+are reported in the table above — see `dich_table$Attenuation` and
+`dich_table$BF_pb`. ⚠ k = `r .k_resp`–`r .k_remiss`; bias estimation has limited power.
 
-**Fixed-effects dichotomous sensitivity (1.5.3):** Singleton et al. ran FE
-sensitivity models for both response and remission (both I² = 0%, so FE and RE
-estimates are identical). RoBMA captures this internally via BF_het — both
-dichotomous analyses return BF_het near 1 and τ ≈ 0, confirming that fixed vs
-random effects makes no practical difference here. No separate RoBMA run is needed.
+**Fixed-effects dichotomous sensitivity:** Singleton et al. ran FE sensitivity
+models for both response and remission. Checked live on this pinned data:
+I² = `r resp_i2`% (response), `r remiss_i2`% (remission) — at these levels FE
+and RE estimates are effectively identical. RoBMA captures this internally via
+BF_het — response returns BF_het = `r resp_bf_het` (τ median = `r resp_tau_med`)
+and remission BF_het = `r remiss_bf_het` (τ median = `r remiss_tau_med`),
+confirming that fixed vs random effects makes no practical difference here. No
+separate RoBMA run is needed.
 
 ---
 
@@ -783,13 +1072,23 @@ Flagged analyses (⚠) have k < 8; BF_pb is highly prior-dependent at small k.
 Degenerate analyses (†) should not be reported at face value.
 
 ```{r full-results-table}
-pub_primary <- c(g = 0.90, lo = 0.55, hi = 1.26)
+.k_primary <- n_distinct(data_main$study)
+
+# Fixed-effect comparator row: reuses robma_primary's own posterior (same
+# fit as the primary row) against Singleton et al.'s published fixed-effect
+# sensitivity value, since RoBMA's BF_het already IS the fixed-vs-random
+# comparison — no separate model needs fitting. Attenuation here compares
+# the model-averaged posterior to the FE estimate specifically, not the
+# random-effects primary estimate.
+fixed_row <- extract_robma(robma_primary, sprintf("Fixed-effect model (k=%d) ‡", .k_primary),
+                           .k_primary, pub_fixed["g"], pub_fixed["lo"], pub_fixed["hi"])
 
 results_table <- bind_rows(
-  extract_robma(robma_primary, "Primary (k=12)", 12,
+  extract_robma(robma_primary, sprintf("Primary (k=%d)", .k_primary), .k_primary,
                 pub_primary["g"], pub_primary["lo"], pub_primary["hi"]),
   subgroup_table,
-  sensitivity_table
+  sensitivity_table,
+  fixed_row
 )
 
 results_table |>
@@ -848,8 +1147,8 @@ diag_table
 # TODO called for BF_effect and BF_pb to be annotated directly on panel A.
 # In the final figure these are reported in the figure caption and in panel C's
 # BF_pb column rather than as text overlays on panel A, to avoid crowding the
-# density plot. The caption reads: "a: dashed = published g = 0.90; BF_effect =
-# 3.68, BF_pb = 3.90 (primary model)."
+# density plot. The caption text below is generated dynamically from
+# pub_primary / p_bf_effect / p_bf_pb — never hardcoded.
 #
 # Captured via pdf() — RoBMA's plot() opens an internal graphics device that
 # desynchronises the png() capture stack. pdf() is file-based and immune.
@@ -858,10 +1157,10 @@ pdf(tmp_pdf_A, width = 5.5, height = 4.5)
 par(mar = c(5, 5, 3, 6))  # mar[4] = 6 to clear the right y-axis labels
 plot(robma_primary, parameter = "mu", prior = TRUE,
      main = expression(bold("a") ~~ "Posterior of" ~ mu ~ "vs prior"))
-abline(v = 0.90, col = "firebrick", lty = 2, lwd = 1.8)
+abline(v = pub_primary["g"], col = "firebrick", lty = 2, lwd = 1.8)
 usr <- par("usr")
-text(x = 0.95, y = usr[4] * 0.70,
-     "Published\ng = 0.90", col = "firebrick", adj = 0, cex = 0.82)
+text(x = pub_primary["g"] + 0.05, y = usr[4] * 0.70,
+     sprintf("Published\ng = %.2f", pub_primary["g"]), col = "firebrick", adj = 0, cex = 0.82)
 invisible(dev.off())
 magick::image_write(magick::image_read_pdf(tmp_pdf_A, density = 300),
                     "tmp_pA.png", format = "png")
@@ -895,38 +1194,55 @@ ggsave("tmp_pB.png", pB_plot, width = 5, height = 4.5, dpi = 300)
 # ── Panel C: comparison forest ───────────────────────────────────────────────
 # Single-level rows (warning flags derived from k)
 base_rows <- results_table |>
-  filter(!grepl("Self-report|Goodwin 10 mg|Crossover", Analysis)) |>
+  filter(!grepl("Self-report|Goodwin 10 mg|Crossover|Fixed-effect", Analysis)) |>
   mutate(
     Analysis = str_remove(Analysis, " \u26a0$"),
     Analysis = if_else(k < 8, paste0(Analysis, " \u26a0"), Analysis),
-    pub_lo   = c(0.55, 0.00, 0.49, 0.60, 0.57, 0.56, 0.44, 0.55),
-    pub_hi   = c(1.26, 1.87, 1.11, 1.03, 1.38, 1.21, 1.60, 1.07),
-    mu_lo_n  = as.numeric(str_extract(mu_CrI, "-?[0-9.]+")),
-    mu_hi_n  = as.numeric(str_extract(mu_CrI, "(?<=, )-?[0-9.]+"))
+    pub_lo   = pub_lo_n,
+    pub_hi   = pub_hi_n,
   ) |>
   select(Analysis, k, `Pub. g`, pub_lo, pub_hi, BF_pb, mu_median, mu_lo_n, mu_hi_n)
 
 # Multilevel row — published comparison is the CHE model (Singleton et al.)
+# Computed locally (not from the Multilevel section below, which runs later
+# in document order) so this chunk doesn't depend on section ordering.
+.s_ml_local <- summary(robma_multilevel)
+ml_label <- sprintf("Multilevel RoBMA (k=%d) †", nrow(data_time))
 ml_row <- tibble(
-  Analysis  = "Multilevel RoBMA (k=37) \u2020",
-  k         = 37L,
-  `Pub. g`  = 0.82,  # CHE estimate (positive convention)
-  pub_lo    = 0.57, pub_hi = 1.08,
-  BF_pb     = 28.27,
-  mu_median = 0.00,
-  mu_lo_n   = -0.15, mu_hi_n = 0.77
+  Analysis  = ml_label,
+  k         = nrow(data_time),
+  `Pub. g`  = unname(pub_multilevel["g"]),
+  pub_lo    = unname(pub_multilevel["lo"]), pub_hi = unname(pub_multilevel["hi"]),
+  BF_pb     = round(.s_ml_local$inclusion_components$inclusion_BF[3], 2),
+  mu_median = round(.s_ml_local$estimates["mu", "0.5"], 2),
+  mu_lo_n   = round(.s_ml_local$estimates["mu", "0.025"], 2),
+  mu_hi_n   = round(.s_ml_local$estimates["mu", "0.975"], 2)
 )
 
 # Combine: multilevel at bottom (row = 1), single-level rows 2–9
-all_labels <- c(rev(base_rows$Analysis), "Multilevel RoBMA (k=37) \u2020")
+all_labels <- c(rev(base_rows$Analysis), ml_label)
 forest_df  <- bind_rows(base_rows, ml_row) |>
   mutate(Analysis = factor(Analysis, levels = rev(all_labels)),
          row      = as.integer(Analysis))
 
+# x-axis range derived from the actual plotted CIs, not hardcoded — a fixed
+# range previously clipped the multilevel row's CI (mu_lo_n = -0.33 fell just
+# outside a hardcoded lower limit of -0.3), which ggplot2 silently drops as
+# NA rather than warning loudly: the errorbar's left cap and connecting line
+# vanished, leaving only the orphaned right cap visible. Deriving the range
+# from the data makes this class of bug structurally impossible.
+x_data_lo   <- min(c(forest_df$pub_lo, forest_df$mu_lo_n), na.rm = TRUE)
+x_data_hi   <- max(c(forest_df$pub_hi, forest_df$mu_hi_n), na.rm = TRUE)
+x_axis_lo   <- x_data_lo - 0.05
+x_bf_label  <- x_data_hi + 0.15
+x_axis_hi   <- x_bf_label + 0.6   # room for the "BF[pb]==X.XX" annotation text
+
 pC_plot <- ggplot(forest_df) +
   geom_vline(xintercept = 0, linetype = "dashed", colour = "grey60") +
-  # Dotted separator between multilevel and single-level rows
-  geom_hline(yintercept = 1.55, linetype = "dotted",
+  # Dotted separator between multilevel and single-level rows — derived from
+  # nrow(ml_row) (always 1 row) so this doesn't silently misalign if the row
+  # composition of results_table ever changes.
+  geom_hline(yintercept = nrow(ml_row) + 0.55, linetype = "dotted",
              colour = "grey60", linewidth = 0.4) +
   geom_errorbar(aes(xmin = pub_lo, xmax = pub_hi, y = row + 0.2),
                 width = 0.15, colour = "#1f4e79", linewidth = 0.6,
@@ -938,12 +1254,12 @@ pC_plot <- ggplot(forest_df) +
                 orientation = "y") +
   geom_point(aes(x = mu_median, y = row - 0.2), shape = 15, size = 2.8,
              colour = "#c55a11") +
-  geom_text(aes(x = 1.85, y = row,
+  geom_text(aes(x = x_bf_label, y = row,
                 label = sprintf("BF[pb]==%.2f", BF_pb)),
             parse = TRUE, size = 2.8, hjust = 0, colour = "grey30") +
   scale_y_continuous(breaks = forest_df$row, labels = forest_df$Analysis,
-                     limits = c(0.5, 9.6)) +
-  scale_x_continuous(limits = c(-0.3, 2.3), breaks = seq(0, 2, 0.5),
+                     limits = c(0.5, nrow(forest_df) + 0.6)) +
+  scale_x_continuous(limits = c(x_axis_lo, x_axis_hi), breaks = scales::breaks_pretty(n = 5),
                      name = "Effect size (Hedges' g)") +
   labs(y = NULL,
        subtitle = "Navy \u25cf = published [95% CI];  Orange \u25a0 = RoBMA bias-corrected [95% CrI]") +
@@ -967,11 +1283,12 @@ cap    <- magick::image_blank(w, 160, color = "white") |>
     # reliably in magick's system font pipeline.
     # Two-line caption with \n to prevent right-edge clipping.
     paste0(
-      "a: posterior of mu (black) vs prior (grey); dashed = published g = 0.90 (Singleton et al. 2026); ",
-      "primary model: BF_effect = 3.68, BF_pb = 3.90.\n",
+      sprintf("a: posterior of mu (black) vs prior (grey); dashed = published g = %.2f (Singleton et al. 2026, primary model); ", pub_primary["g"]),
+      sprintf("primary model: BF_effect = %.2f, BF_pb = %.2f.\n", p_bf_effect, p_bf_pb),
       "b: omega posterior median [95% CrI] per p-value interval; dashed = omega = 1 (no selection).\n",
       "c: BF_pb per row. Triangle = k < 8; interpret BF_pb cautiously. ",
-      "Dagger (dagger) = multilevel RoBMA (k = 37 effect sizes, 12 study clusters); ",
+      sprintf("Dagger (dagger) = multilevel RoBMA (k = %d effect sizes, %d study clusters); ",
+              nrow(data_time), n_distinct(data_time$study)),
       "published = CHE model estimate (Singleton et al.); within-study selection caveat applies."
     ),
     size = 24, color = "grey45", gravity = "NorthWest", location = "+20+12")
@@ -991,25 +1308,34 @@ prior_plot_df <- prior_table |>
   mutate(Prior = factor(Prior, levels = rev(Prior)),
          row   = as.integer(Prior))
 
+prior_plot_df <- prior_plot_df |>
+  mutate(mu_lo_n = as.numeric(str_extract(mu_CrI, "-?[0-9.]+")),
+         mu_hi_n = as.numeric(str_extract(mu_CrI, "(?<=, )-?[0-9.]+")))
+
+# x-axis range derived from data, not hardcoded — see the identical fix (and
+# its rationale) in Figure 1 Panel C above.
+ed1_x_lo    <- min(prior_plot_df$mu_lo_n, na.rm = TRUE) - 0.05
+ed1_x_hi_dat<- max(prior_plot_df$mu_hi_n, na.rm = TRUE)
+ed1_x_label <- ed1_x_hi_dat + 0.15
+ed1_x_hi    <- ed1_x_label + 0.85   # room for the "BF[effect]==X BF[pb]==X" annotation
+
 ed1 <- ggplot(prior_plot_df) +
   geom_point(aes(x = mu_median, y = row), shape = 18, size = 4,
              colour = "#c55a11") +
-  geom_errorbar(aes(
-    xmin = as.numeric(str_extract(mu_CrI, "-?[0-9.]+")),
-    xmax = as.numeric(str_extract(mu_CrI, "(?<=, )-?[0-9.]+")),
-    y = row), width = 0.2, colour = "#c55a11", linewidth = 0.7,
+  geom_errorbar(aes(xmin = mu_lo_n, xmax = mu_hi_n, y = row),
+    width = 0.2, colour = "#c55a11", linewidth = 0.7,
     orientation = "y") +
-  geom_text(aes(x = 1.25, y = row,
+  geom_text(aes(x = ed1_x_label, y = row,
                 label = sprintf("BF[effect]==%.2f~~BF[pb]==%.2f",
                                 BF_effect, BF_pb)),
             parse = TRUE, size = 3.2, hjust = 0) +
-  geom_vline(xintercept = 0,    linetype = "dashed", colour = "grey60") +
-  geom_vline(xintercept = 0.53, linetype = "dotted", colour = "#c55a11", alpha = 0.5) +
+  geom_vline(xintercept = 0,       linetype = "dashed", colour = "grey60") +
+  geom_vline(xintercept = p_mu_med, linetype = "dotted", colour = "#c55a11", alpha = 0.5) +
   scale_y_continuous(breaks = prior_plot_df$row, labels = prior_plot_df$Prior) +
-  scale_x_continuous(limits = c(-0.1, 2.2), breaks = seq(0, 2, 0.5)) +
+  scale_x_continuous(limits = c(ed1_x_lo, ed1_x_hi), breaks = scales::breaks_pretty(n = 5)) +
   labs(x = "RoBMA μ median [95% CrI]", y = NULL,
        title = "Extended Data Fig. 1 — Prior sensitivity analysis",
-       subtitle = "Dotted vertical = default PSMA estimate (μ = 0.53)") +
+       subtitle = sprintf("Dotted vertical = default PSMA estimate (μ = %.2f)", p_mu_med)) +
   theme_classic(base_size = 11) +
   theme(plot.title    = element_text(face = "bold", size = 11),
         plot.subtitle = element_text(size = 8.5, colour = "grey40"),
@@ -1022,20 +1348,18 @@ ggsave("fig_ED1_prior_sensitivity.jpg", ed1, width = 9, height = 4.5, dpi = 300)
 ### Extended Data Figure 2: Dichotomous outcomes
 
 ```{r ed-fig2, fig.width=9, fig.height=3.8}
-dich_plot_df <- dich_table |>
+dich_plot_df2 <- dich_table |>
   mutate(Analysis = factor(Analysis, levels = rev(Analysis)),
-         row = as.integer(Analysis),
-         pub_lo = c(1.93, 3.39), pub_hi = c(3.97, 4.82),
-         mu_lo  = as.numeric(str_extract(`RoBMA CrI`, "[0-9.]+")),
-         mu_hi  = as.numeric(str_extract(`RoBMA CrI`, "(?<=, )[0-9.]+")))
+         row    = as.integer(Analysis),
+         pub_lo = pub_lo_n, pub_hi = pub_hi_n,
+         mu_lo  = mu_lo_n,  mu_hi  = mu_hi_n)
 
-# Add BF_pb values directly — avoid \uxxxx inside backtick names (knitr parser error)
-dich_plot_df2 <- dich_plot_df |>
-  mutate(BF_pb = case_when(
-    grepl("Response",  as.character(Analysis)) ~ 3.40,
-    grepl("Remission", as.character(Analysis)) ~ 2.24,
-    TRUE ~ NA_real_
-  ))
+# x-axis range derived from data, not hardcoded — see the identical fix (and
+# its rationale) in Figure 1 Panel C above.
+ed2_x_lo    <- min(c(dich_plot_df2$pub_lo, dich_plot_df2$mu_lo), na.rm = TRUE) - 0.2
+ed2_x_hi_dat<- max(c(dich_plot_df2$pub_hi, dich_plot_df2$mu_hi), na.rm = TRUE)
+ed2_x_label <- ed2_x_hi_dat + 0.4
+ed2_x_hi    <- ed2_x_label + 2   # room for the "BF[pb]==X.XX" annotation
 
 ed2 <- ggplot(dich_plot_df2) +
   geom_vline(xintercept = 1, linetype = "dashed", colour = "grey60") +
@@ -1050,12 +1374,12 @@ ed2 <- ggplot(dich_plot_df2) +
   geom_point(aes(x = `RoBMA RR`, y = row - 0.2), shape = 15, size = 3,
              colour = "#c55a11") +
   # BF_pb annotation — mirrors style of panel c in Fig. 1
-  geom_text(aes(x = 7.2, y = row,
+  geom_text(aes(x = ed2_x_label, y = row,
                 label = sprintf("BF[pb]==%.2f", BF_pb)),
             parse = TRUE, size = 3.2, hjust = 0, colour = "grey30") +
   scale_y_continuous(breaks = dich_plot_df2$row,
                      labels = dich_plot_df2$Analysis) +
-  scale_x_continuous(limits = c(0.5, 9.2), breaks = 1:6,
+  scale_x_continuous(limits = c(ed2_x_lo, ed2_x_hi), breaks = scales::breaks_pretty(n = 6),
                      name = "Risk Ratio") +
   labs(
     y        = NULL,
@@ -1090,9 +1414,9 @@ and are not replicated here. Each is addressed in the manuscript's Methods or Di
 
 | Analysis in Singleton et al. | RoBMA status | Reason |
 |---|---|---|
-| Three-level CHE model (k = 37) | **Replicated and extended** — see Multilevel RoBMA section below | RoBMA 4.0 `cluster` argument implements compound-symmetric structure (Bartoš, Maier & Wagenmakers, 2026); adds publication bias correction |
+| Three-level CHE model (k = `r nrow(data_time)`) | **Replicated and extended** — see Multilevel RoBMA section below | RoBMA 4.0 `cluster` argument implements compound-symmetric structure (Bartoš, Maier & Wagenmakers, 2026); adds publication bias correction |
 | Rho sensitivity sweep | Not replicated | Specific to CHE; not applicable to RoBMA |
-| Meta-regression on time_days | Not replicated | Out of scope; β = 0.0019/day (p = 0.17) in original suggests no decay |
+| Meta-regression on time_days | Not replicated | Out of scope; β = `r che_timereg_beta`/day (p = `r che_timereg_p`) live-recomputed above |
 | Design moderation test | Partial | Parallel/crossover RoBMA runs serve as substitute |
 | Fixed-effects model | Captured internally | RoBMA models fixed effects via BF_het component |
 | bayesmeta sensitivity | Superseded | RoBMA extends bayesmeta by adding publication bias correction |
@@ -1104,8 +1428,9 @@ and are not replicated here. Each is addressed in the manuscript's Methods or Di
 RoBMA 4.0.0 supports multilevel (clustered) meta-analysis via the `cluster`
 argument, implementing the same compound-symmetric structure as the three-level
 CHE model in Singleton et al. (Bartoš, Maier & Wagenmakers, 2026, *Behavior
-Research Methods*). This allows publication bias correction across the full
-k = 37 effect sizes from 12 studies, partitioning heterogeneity into
+Research Methods*), fit on the same `r n_distinct(data_time$study)`-study
+population as their own CHE model (all timepoints retained, k = `r nrow(data_time)`
+effect sizes), partitioning heterogeneity into
 within-study (τ_within, across timepoints) and between-study (τ_between)
 components simultaneously with bias adjustment.
 
@@ -1120,8 +1445,8 @@ RoBMA (using one effect size per study) remains the most methodologically
 straightforward analysis for publication bias detection.
 
 ```{r multilevel-data}
-# Multi-timepoint data: same studies as primary, all timepoints retained
-# data_time contains k = 37 effect sizes from 12 studies (1-6 per study)
+# Multi-timepoint data: same studies as Singleton et al.'s own CHE model
+# (data_main population), all timepoints retained.
 ml_input <- data_time |>
   select(study, .g, .g_se) |>
   filter(!is.na(.g), !is.na(.g_se)) |>
@@ -1154,13 +1479,27 @@ summary_heterogeneity(robma_multilevel)
 
 ```{r multilevel-comparison}
 s_ml <- summary(robma_multilevel)
-cat("── Multilevel RoBMA vs CHE model (Singleton et al.) ─────────────\n\n")
 
-cat("CHE (frequentist, no bias correction):\n")
-cat("  μ = 0.82 [0.57, 1.08]\n")
-cat("  τ_between = 0.287, τ_within = 0.212\n\n")
+# Extracted once here; referenced by inline `r` in "Key findings" below and
+# by Panel C's ml_row in the Figures section (this chunk runs first).
+ml_mu_med   <- round(s_ml$estimates["mu", "0.5"], 2)
+ml_mu_lo    <- round(s_ml$estimates["mu", "0.025"], 2)
+ml_mu_hi    <- round(s_ml$estimates["mu", "0.975"], 2)
+ml_bf_effect<- round(s_ml$inclusion_components$inclusion_BF[1], 2)
+ml_bf_het   <- round(s_ml$inclusion_components$inclusion_BF[2], 2)
+ml_bf_pb    <- round(s_ml$inclusion_components$inclusion_BF[3], 2)
 
-cat("Multilevel RoBMA (bias-corrected, same 37 effect sizes):\n")
+che_tau2 <- sum(.che_fit$sigma2)
+che_n    <- sum(data_main$n_arm1 + data_main$n_arm2, na.rm = TRUE)
+che_k    <- n_distinct(data_main$study)
+
+cat("Multilevel RoBMA vs CHE model (Singleton et al. methodology, live-fit here)\n\n")
+
+cat(sprintf("CHE (frequentist, no bias correction, k=%d, n=%d): mu = %.2f [%.2f, %.2f], tau2 = %.2f\n\n",
+    che_k, che_n, pub_multilevel["g"], pub_multilevel["lo"], pub_multilevel["hi"], che_tau2))
+
+cat(sprintf("Multilevel RoBMA (bias-corrected, same %d studies, k=%d effect sizes):\n",
+    n_distinct(data_time$study), nrow(data_time)))
 cat(sprintf("  μ median = %.2f [%.2f, %.2f]\n",
             s_ml$estimates["mu","0.5"],
             s_ml$estimates["mu","0.025"],
@@ -1177,9 +1516,18 @@ cat(sprintf("  BF_pb     = %.2f  (posterior prob = %.2f)\n",
 cat(sprintf("  ESS_mu    = %d  R-hat = %.3f\n",
             round(s_ml$estimates["mu","ESS"]),
             s_ml$estimates["mu","R_hat"]))
-cat("\n⚠ ESS_mu = 279 (below target of 1000). Estimates for mu are\n")
+cat(sprintf("\n%s ESS_mu = %d (target: 400). Estimates for mu are\n",
+    if (s_ml$estimates["mu","ESS"] < 400) "⚠" else "✓",
+    round(s_ml$estimates["mu","ESS"])))
 cat("  less stable than the primary model; interpret with caution.\n")
-cat("  The BF_pb and heterogeneity components are well-sampled (ESS > 2000).\n\n")
+.ml_tau_ess   <- round(s_ml$estimates["tau", "ESS"])
+.ml_bias_ess  <- summary(robma_multilevel)$estimates_bias[, "ESS"]
+.ml_omega_ess_range <- range(.ml_bias_ess[2:6], na.rm = TRUE)
+cat(sprintf("  Heterogeneity (tau) is well-sampled: ESS = %d. Weight-function\n", .ml_tau_ess))
+cat(sprintf("  (omega) components: ESS %d-%d. PET/PEESE ESS is lower (%d/%d) —\n",
+    round(.ml_omega_ess_range[1]), round(.ml_omega_ess_range[2]),
+    round(.ml_bias_ess["PET"]), round(.ml_bias_ess["PEESE"])))
+cat("  interpret those two components with the same caution as mu.\n\n")
 
 cat("Heterogeneity decomposition:\n")
 het    <- summary_heterogeneity(robma_multilevel)
@@ -1194,25 +1542,22 @@ cat(sprintf("  ρ (between allocation) = %.3f [%.3f, %.3f]\n",
             het_df["rho",        "Median"], het_df["rho",        "0.025"], het_df["rho",        "0.975"]))
 ```
 
-**Key findings from multilevel RoBMA:**
+**Key findings from multilevel RoBMA:** (all values below are pulled live from
+`s_ml` / `p_bf_pb` etc. — nothing here is asserted independently of the fit.)
 
-1. **BF_pb = 28.27** (strong evidence) — substantially higher than the single-level
-   primary model (BF_pb = 3.90). When the full multi-timepoint structure is modelled,
-   publication bias evidence is much clearer.
+1. **BF_pb = `r ml_bf_pb`** (`r bf_label(ml_bf_pb)`) vs the single-level primary
+   model (BF_pb = `r p_bf_pb`, `r bf_label(p_bf_pb)`).
 
-2. **μ median = 0.00 [−0.15, 0.77]** — The bias-corrected effect collapses to near
-   zero, compared to g = 0.82 in the CHE model. The credible interval is very wide,
-   spanning negative to moderately positive values. This reflects high uncertainty,
-   not a definitive null finding.
+2. **μ median = `r ml_mu_med` [`r ml_mu_lo`, `r ml_mu_hi`]** vs g = `r pub_multilevel["g"]`
+   in the CHE model.
 
-3. **BF_effect = 0.84** (weak evidence against effect) — In contrast to the
-   single-level primary model (BF_effect = 3.68, moderate evidence for effect).
+3. **BF_effect = `r ml_bf_effect`** (`r bf_label(ml_bf_effect)`) vs the
+   single-level primary model (BF_effect = `r p_bf_effect`, `r bf_label(p_bf_effect)`).
 
-4. **ρ = 0.80** — Most heterogeneity is between studies rather than within studies
-   across timepoints, consistent with the CHE model's σ²_between > σ²_within.
+4. **ρ (between-study allocation)** — see the heterogeneity decomposition table above.
 
-5. **PEESE mean = 3.34 [0, 7.57]** — Active PEESE component; caution warranted
-   given the within-study interpretation issue noted above.
+5. **PEESE component** — see `summary(robma_multilevel)` output above for the
+   PET/PEESE posteriors; interpret with the within-study caveat noted above.
 
 ---
 
@@ -1277,40 +1622,49 @@ cat(sprintf("  μ median  = %.2f  [%.2f, %.2f]\n",
             s_prim$estimates[1,"0.5"],
             s_prim$estimates[1,"0.025"],
             s_prim$estimates[1,"0.975"]))
-cat("  Published:  g = 0.90  [0.55, 1.26]\n")
+cat(sprintf("  Published:  g = %.2f  [%.2f, %.2f]  (Singleton et al., primary model, k=%d)\n",
+            pub_primary["g"], pub_primary["lo"], pub_primary["hi"], n_distinct(data_main$study)))
 cat(sprintf("  Attenuation: ~%.0f%%\n",
-            (1 - s_prim$estimates[1,"0.5"] / 0.90) * 100))
+            (1 - s_prim$estimates[1,"0.5"] / pub_primary["g"]) * 100))
 cat("\n")
 cat("KEY SUBGROUP FINDING\n")
 cat("───────────────────────────────────────────────────────────────\n")
-cat("  When open-label studies are excluded: BF_pb → 0.73 (no bias evidence)\n")
-cat("  When Davis 2021 (outlier) is excluded: BF_pb → 0.89 (no bias evidence)\n")
-cat("  → Publication bias signal is attributable to open-label/outlier studies,\n")
-cat("    not to suppression of blinded parallel RCTs.\n\n")
+bf_davis_val <- sensitivity_table$BF_pb[grepl("Davis", sensitivity_table$Analysis)]
+cat(sprintf("  %s: BF_pb = %.2f\n",
+    subgroup_table$Analysis[grepl("open-label", subgroup_table$Analysis)],
+    bf_excol_val))
+cat(sprintf("  %s: BF_pb = %.2f\n",
+    sensitivity_table$Analysis[grepl("Davis", sensitivity_table$Analysis)],
+    bf_davis_val))
+signal_drops_summary <- bf_excol_val < p_bf_pb && bf_davis_val < p_bf_pb
+cat(sprintf("  -> Bias evidence is %s in both subsets than in the primary model (BF_pb = %.2f):\n",
+    if (signal_drops_summary) "lower" else "NOT uniformly lower", p_bf_pb))
+cat(sprintf("     %s attributable mainly to open-label/outlier studies.\n\n",
+    if (signal_drops_summary) "consistent with the bias signal being" else "the 'open-label/outlier driven' framing is NOT supported —"))
 cat("PRIOR SENSITIVITY\n")
 cat("───────────────────────────────────────────────────────────────\n")
-cat(sprintf("  BF_pb range: %.2f – %.2f across four priors (robust)\n",
+cat(sprintf("  BF_pb range: %.2f – %.2f across four priors\n",
             min(prior_table$BF_pb), max(prior_table$BF_pb)))
-cat(sprintf("  μ median range: %.2f – %.2f across four priors (robust)\n",
+cat(sprintf("  μ median range: %.2f – %.2f across four priors\n",
             min(prior_table$mu_median), max(prior_table$mu_median)))
 cat("\n")
 cat("DICHOTOMOUS OUTCOMES\n")
 cat("───────────────────────────────────────────────────────────────\n")
-cat("  Response:  RR = 2.29 [1.00, 3.53]  (published: 2.77)  17% attenuation\n")
-cat("  Remission: RR = 3.19 [1.00, 5.37]  (published: 4.04)  21% attenuation\n")
+cat(sprintf("  Response:  RR = %.2f %s  (published: %.2f)  %s\n",
+            dich_table$`RoBMA RR`[1], dich_table$`RoBMA CrI`[1],
+            dich_table$`Pub. RR`[1], dich_table$Attenuation[1]))
+cat(sprintf("  Remission: RR = %.2f %s  (published: %.2f)  %s\n",
+            dich_table$`RoBMA RR`[2], dich_table$`RoBMA CrI`[2],
+            dich_table$`Pub. RR`[2], dich_table$Attenuation[2]))
 cat("═══════════════════════════════════════════════════════════════\n")
 ```
 
 These results do not overturn Singleton et al. (2026). They refine the
-uncertainty around the effect estimate and provide formal evidence that the
-published literature on psilocybin for depression shows moderate publication
-bias (BF_pb ≈ 3.9), with a bias-corrected pooled effect approximately 41%
-smaller than the frequentist estimate. The effect remains credible (posterior
-probability ≈ 0.79) but the credible interval is considerably wider than the
-original analysis implies. Critically, the bias signal dissipates when open-label
-designs and the Davis 2021 outlier are removed, suggesting it reflects
-design-specific expectancy inflation rather than file-drawer suppression of
-blinded trials.
+uncertainty around the effect estimate and provide formal evidence about
+publication bias in this literature (BF_pb = `r p_bf_pb`), with a
+bias-corrected pooled effect approximately `r sprintf("%.0f", (1 - p_mu_med/pub_primary["g"])*100)`%
+smaller than the frequentist estimate (posterior probability = `r p_pp_pb`).
+`r if (signal_drops_summary) "The bias signal is attributable mainly to open-label and outlier studies rather than suppression of blinded RCTs generally (see the open-label/Davis 2021 comparison above)." else "The open-label/outlier subgroup comparison above does NOT currently support the 'driven by open-label designs' framing — revise this conclusion before submission."`
 
 We recommend RoBMA be incorporated as a standard sensitivity analysis in future
 updates of this living systematic review.
